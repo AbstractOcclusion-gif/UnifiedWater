@@ -41,5 +41,14 @@ namespace AbstractOcclusion.UnifiedWater
 
         internal static readonly int DebugField = Shader.PropertyToID("_DebugField");
         internal static readonly int DebugValueScale = Shader.PropertyToID("_DebugValueScale");
+
+        // Surface globals: the primary domain's field textures and world extent, published each frame
+        // for the water surface shader to sample. The HLSL side reads these by the same names, and the
+        // extent trio mirrors BoundedDomainExtent so the world<->uv mapping stays a single formula.
+        internal static readonly int DynamicGlobal = Shader.PropertyToID("_UnifiedWater_Dynamic");
+        internal static readonly int NormalFoamGlobal = Shader.PropertyToID("_UnifiedWater_NormalFoam");
+        internal static readonly int ExtentCenter = Shader.PropertyToID("_UnifiedWater_Center");
+        internal static readonly int ExtentSize = Shader.PropertyToID("_UnifiedWater_Size");
+        internal static readonly int ExtentTexelSize = Shader.PropertyToID("_UnifiedWater_TexelSize");
     }
 }

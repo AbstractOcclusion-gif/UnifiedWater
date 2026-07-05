@@ -26,6 +26,16 @@ namespace AbstractOcclusion.UnifiedWater
 
         internal WaterDomain Domain => _domain;
 
+        /// <summary>Square world size, in metres, of this domain's footprint. The surface mesh spans it.</summary>
+        internal float SizeMeters => sizeMeters;
+
+        /// <summary>
+        /// Surface mesh density (quads per side) from the assigned tier, falling back to the default
+        /// when no tier is set yet so an in-editor surface can build before the tier is wired.
+        /// </summary>
+        internal int SurfaceMeshResolution =>
+            tier != null ? tier.SurfaceMeshResolution : WaterSurfaceConstants.DefaultSurfaceMeshResolution;
+
         /// <summary>
         /// Drops a ripple at a world position. Gameplay and the demo interactor call this; it converts
         /// to the field's uv space via the domain extent, so callers never touch texels. No-op until

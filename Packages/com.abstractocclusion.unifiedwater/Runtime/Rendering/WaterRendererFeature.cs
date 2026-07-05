@@ -21,17 +21,23 @@ namespace AbstractOcclusion.UnifiedWater
         private float debugValueScale = WaterDebugConstants.DefaultValueScale;
 
         private WaterFieldUpdatePass _updatePass;
+        private WaterFieldPublishPass _publishPass;
         private WaterFieldDebugPass _debugPass;
 
         public override void Create()
         {
             _updatePass = new WaterFieldUpdatePass();
+            _publishPass = new WaterFieldPublishPass();
             _debugPass = new WaterFieldDebugPass();
         }
 
         public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
         {
             renderer.EnqueuePass(_updatePass);
+
+            // After the update pass so the field's ping-pong is settled, before opaques so the surface
+            // material has its globals bound by the time anything draws water this frame.
+            renderer.EnqueuePass(_publishPass);
 
             if (showDebugView)
             {

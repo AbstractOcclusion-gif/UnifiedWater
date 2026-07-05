@@ -15,6 +15,13 @@ namespace AbstractOcclusion.UnifiedWater
 
         internal static IReadOnlyList<WaterDomain> Domains => RegisteredDomains;
 
+        /// <summary>
+        /// The primary domain — the first registered — or null when none is alive. Consumers that
+        /// sample a single body (the surface globals publisher, the debug view) resolve "primary"
+        /// here so the choice of "first" lives in one place rather than being reimplemented as index 0.
+        /// </summary>
+        internal static WaterDomain Primary => RegisteredDomains.Count > 0 ? RegisteredDomains[0] : null;
+
         internal static void Register(WaterDomain domain)
         {
             if (domain == null)

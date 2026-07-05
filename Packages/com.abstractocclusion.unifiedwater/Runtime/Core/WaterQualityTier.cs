@@ -33,6 +33,11 @@ namespace AbstractOcclusion.UnifiedWater
         [Range(WaterSimConstants.MinFixedDeltaTime, WaterSimConstants.MaxFixedDeltaTime)]
         private float simFixedDeltaTime = WaterSimConstants.DefaultFixedDeltaTime;
 
+        [Tooltip("Quads per side of the procedural surface mesh. Independent of field resolution.")]
+        [SerializeField]
+        [Range(WaterSurfaceConstants.MinSurfaceMeshResolution, WaterSurfaceConstants.MaxSurfaceMeshResolution)]
+        private int surfaceMeshResolution = WaterSurfaceConstants.DefaultSurfaceMeshResolution;
+
         public int FieldResolution => fieldResolution;
 
         internal float RippleDamping => rippleDamping;
@@ -40,5 +45,7 @@ namespace AbstractOcclusion.UnifiedWater
         internal float PropagationSpeed => propagationSpeed;
 
         internal float SimFixedDeltaTime => simFixedDeltaTime;
+
+        internal int SurfaceMeshResolution => surfaceMeshResolution;
     }
 }
