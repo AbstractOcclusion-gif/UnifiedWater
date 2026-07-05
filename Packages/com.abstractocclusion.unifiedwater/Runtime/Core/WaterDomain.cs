@@ -16,16 +16,23 @@ namespace AbstractOcclusion.UnifiedWater
     {
         internal WaterField Field { get; }
 
+        /// <summary>The domain's world footprint and world↔texel mapping.</summary>
+        internal BoundedDomainExtent Extent { get; }
+
         /// <summary>Providers in canonical pipeline order (ascending <see cref="IWaterFieldProvider.WriteOrder"/>).</summary>
         internal IReadOnlyList<IWaterFieldProvider> Providers { get; }
 
-        internal WaterDomain(WaterQualityTier tier, IReadOnlyList<IWaterFieldProvider> providers)
+        internal WaterDomain(
+            WaterQualityTier tier,
+            IReadOnlyList<IWaterFieldProvider> providers,
+            BoundedDomainExtent extent)
         {
             if (tier == null)
             {
                 throw new ArgumentNullException(nameof(tier));
             }
 
+            Extent = extent;
             Providers = OrderProviders(providers);
 
             var layers = DeriveFieldLayers(Providers);
@@ -33,6 +40,22 @@ namespace AbstractOcclusion.UnifiedWater
             Field = new WaterField(descriptor);
 
             SetupProviders(Providers, descriptor);
+        }
+
+        /// <summary>
+        /// Routes a ripple impulse to whichever providers accept one. Callers work in world space and
+        /// convert to a uv <see cref="WaterImpulse"/> via <see cref="Extent"/> before calling this, so
+        /// the domain never exposes a concrete provider.
+        /// </summary>
+        internal void InjectImpulse(WaterImpulse impulse)
+        {
+            foreach (var provider in Providers)
+            {
+                if (provider is IImpulseReceiver receiver)
+                {
+                    receiver.Enqueue(impulse);
+                }
+            }
         }
 
         public void Dispose()

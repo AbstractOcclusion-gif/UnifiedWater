@@ -18,6 +18,20 @@ namespace AbstractOcclusion.UnifiedWater
         [Range(WaterFieldConstants.MinResolution, WaterFieldConstants.MaxResolution)]
         private int fieldResolution = WaterFieldConstants.DefaultResolution;
 
+        [Tooltip("Per-step energy retention of the ripple sim. Lower settles faster.")]
+        [SerializeField]
+        [Range(WaterSimConstants.MinDamping, WaterSimConstants.MaxDamping)]
+        private float rippleDamping = WaterSimConstants.DefaultDamping;
+
+        [Tooltip("Per-step wave coupling of the ripple sim. Above ~0.5 the sim becomes unstable.")]
+        [SerializeField]
+        [Range(WaterSimConstants.MinPropagationSpeed, WaterSimConstants.MaxPropagationSpeed)]
+        private float propagationSpeed = WaterSimConstants.DefaultPropagationSpeed;
+
         public int FieldResolution => fieldResolution;
+
+        internal float RippleDamping => rippleDamping;
+
+        internal float PropagationSpeed => propagationSpeed;
     }
 }

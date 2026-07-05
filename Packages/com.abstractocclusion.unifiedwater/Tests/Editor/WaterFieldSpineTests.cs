@@ -89,7 +89,48 @@ namespace AbstractOcclusion.UnifiedWater.Tests
         public void Domain_Rejects_NullTier()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                new WaterDomain(null, new IWaterFieldProvider[] { new FakeProvider(0, WaterLayer.Dynamic) }));
+                new WaterDomain(
+                    null,
+                    new IWaterFieldProvider[] { new FakeProvider(0, WaterLayer.Dynamic) },
+                    default));
+        }
+
+        [Test]
+        public void Extent_MapsCenterToUvCentre()
+        {
+            var extent = new BoundedDomainExtent(new Vector2(5f, 5f), 10f, 256);
+
+            var uv = extent.WorldToUv(new Vector3(5f, 99f, 5f));
+
+            Assert.AreEqual(0.5f, uv.x, 1e-5f);
+            Assert.AreEqual(0.5f, uv.y, 1e-5f);
+        }
+
+        [Test]
+        public void Extent_RoundTripsWorldAndUv()
+        {
+            var extent = new BoundedDomainExtent(new Vector2(2f, -3f), 8f, 128);
+            var world = new Vector3(3.5f, 0f, -1.25f);
+
+            var back = extent.UvToWorld(extent.WorldToUv(world));
+
+            Assert.AreEqual(world.x, back.x, 1e-4f);
+            Assert.AreEqual(world.z, back.y, 1e-4f);
+        }
+
+        [Test]
+        public void Extent_TexelSizeIsSizeOverResolution()
+        {
+            var extent = new BoundedDomainExtent(Vector2.zero, 16f, 256);
+
+            Assert.AreEqual(16f / 256f, extent.TexelSizeMeters, 1e-6f);
+        }
+
+        [Test]
+        public void Extent_Rejects_NonPositiveSize()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                new BoundedDomainExtent(Vector2.zero, 0f, 256));
         }
 
         [Test]

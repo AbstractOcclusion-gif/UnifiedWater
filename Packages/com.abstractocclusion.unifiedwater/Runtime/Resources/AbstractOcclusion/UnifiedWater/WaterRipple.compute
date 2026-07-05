@@ -1,0 +1,88 @@
+// Ripple height-field simulation for the Dynamic layer (height in R, velocity in G). Written fresh
+// in our namespace; the height-field idea is common to many interactive-water systems but no
+// reference code is used. Two kernels: integrate advances the wave equation with a reflective
+// boundary; inject adds cosine-bump disturbances. Both write the double-buffered Dynamic layer.
+
+#pragma kernel CsIntegrate
+#pragma kernel CsInject
+
+// numthreads edge mirrors WaterFieldConstants.SimThreadGroupSize (8); the C# side guarantees the
+// field resolution is a whole multiple of it.
+#define THREAD_GROUP_SIZE 8
+#define PI 3.14159265358979
+
+// Bound as UAVs (the field allows random write), so neighbours can be read by index. Integrate reads
+// _ReadField and writes the distinct _WriteField; inject read-modify-writes _WriteField in place.
+RWTexture2DArray<float4> _ReadField;
+RWTexture2DArray<float4> _WriteField;
+
+float _RippleDamping;
+float _PropagationSpeed;
+int _Resolution;
+int _CascadeCount;
+
+StructuredBuffer<float4> _Impulses; // xy = centre uv, z = radius uv, w = strength
+int _ImpulseCount;
+
+int ClampCoord(int coordinate)
+{
+    return clamp(coordinate, 0, _Resolution - 1);
+}
+
+[numthreads(THREAD_GROUP_SIZE, THREAD_GROUP_SIZE, 1)]
+void CsIntegrate(uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.x >= _Resolution || (int)id.y >= _Resolution || (int)id.z >= _CascadeCount)
+    {
+        return;
+    }
+
+    int x = (int)id.x;
+    int y = (int)id.y;
+    int slice = (int)id.z;
+
+    float4 self = _ReadField[id];
+    float height = self.r;
+    float velocity = self.g;
+
+    // Edge-clamped neighbour reads give a reflective (Neumann) boundary: waves bounce off the rim.
+    float left = _ReadField[uint3(ClampCoord(x - 1), y, slice)].r;
+    float right = _ReadField[uint3(ClampCoord(x + 1), y, slice)].r;
+    float down = _ReadField[uint3(x, ClampCoord(y - 1), slice)].r;
+    float up = _ReadField[uint3(x, ClampCoord(y + 1), slice)].r;
+
+    float average = 0.25 * (left + right + down + up);
+    velocity += (average - height) * _PropagationSpeed;
+    velocity *= _RippleDamping;
+    height += velocity;
+
+    _WriteField[id] = float4(height, velocity, 0.0, 0.0);
+}
+
+[numthreads(THREAD_GROUP_SIZE, THREAD_GROUP_SIZE, 1)]
+void CsInject(uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.x >= _Resolution || (int)id.y >= _Resolution || (int)id.z >= _CascadeCount)
+    {
+        return;
+    }
+
+    float2 uv = (float2(id.xy) + 0.5) / _Resolution;
+
+    float added = 0.0;
+    for (int i = 0; i < _ImpulseCount; i++)
+    {
+        float4 impulse = _Impulses[i];
+        float radius = impulse.z;
+        float dist = distance(uv, impulse.xy);
+        if (dist < radius)
+        {
+            float falloff = 0.5 * (cos(dist / radius * PI) + 1.0);
+            added += impulse.w * falloff;
+        }
+    }
+
+    float4 current = _WriteField[id];
+    current.r += added;
+    _WriteField[id] = current;
+}

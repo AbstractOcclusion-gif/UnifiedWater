@@ -17,9 +17,31 @@ namespace AbstractOcclusion.UnifiedWater
         [SerializeField]
         private WaterQualityTier tier;
 
+        [Tooltip("Square world size, in metres, of the water footprint centred on this transform.")]
+        [SerializeField]
+        [Min(WaterSimConstants.MinDomainSizeMeters)]
+        private float sizeMeters = WaterSimConstants.DefaultDomainSizeMeters;
+
         private WaterDomain _domain;
 
         internal WaterDomain Domain => _domain;
+
+        /// <summary>
+        /// Drops a ripple at a world position. Gameplay and the demo interactor call this; it converts
+        /// to the field's uv space via the domain extent, so callers never touch texels. No-op until
+        /// the volume is enabled.
+        /// </summary>
+        public void InjectImpulse(Vector3 worldPosition, float radiusMeters, float strength)
+        {
+            if (_domain == null)
+            {
+                return;
+            }
+
+            var centerUv = _domain.Extent.WorldToUv(worldPosition);
+            float radiusUv = radiusMeters / sizeMeters;
+            _domain.InjectImpulse(new WaterImpulse(centerUv, radiusUv, strength));
+        }
 
         private void OnEnable()
         {
@@ -29,7 +51,11 @@ namespace AbstractOcclusion.UnifiedWater
                     $"{nameof(WaterVolume)} on '{name}' has no {nameof(WaterQualityTier)} assigned.");
             }
 
-            _domain = new WaterDomain(tier, WaterProviderFactory.CreateDefault());
+            var position = transform.position;
+            var extent = new BoundedDomainExtent(
+                new Vector2(position.x, position.z), sizeMeters, tier.FieldResolution);
+
+            _domain = new WaterDomain(tier, WaterProviderFactory.Create(tier), extent);
             WaterDomainRegistry.Register(_domain);
         }
 

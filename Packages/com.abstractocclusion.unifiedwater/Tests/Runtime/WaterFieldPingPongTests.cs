@@ -7,31 +7,38 @@ using UnityEngine.TestTools;
 namespace AbstractOcclusion.UnifiedWater.PlayTests
 {
     /// <summary>
-    /// GPU proof that the Dynamic layer's import → ping-pong → swap plumbing works: it drives the
-    /// diagnostic kernel (reads previous value, writes value + increment) for several frames, then
-    /// reads back the field. A correctly swapped double buffer climbs by increment*frames; a broken
-    /// swap or a self-overwriting single buffer would not. This exercises the same compute + swap
-    /// path the render feature uses, without needing a URP asset wired in the test.
+    /// GPU proof of the ripple simulation: seed one drop with the inject kernel, then run the
+    /// integrate kernel (ping-ponging the double buffer) for several steps, and read the field back.
+    /// A working sim spreads the drop outward (a texel that started at zero away from the centre
+    /// becomes non-zero) and, with damping below one, does not gain energy. A broken ping-pong, swap,
+    /// or boundary would fail one of these.
     /// </summary>
     public sealed class WaterFieldPingPongTests
     {
         private const int Resolution = 16;
         private const int CascadeCount = 1;
-        private const int FrameCount = 5;
-        private const float Increment = 1f;
-        private const float Tolerance = 0.001f;
+        private const int IntegrateSteps = 20;
+        private const int CentreTexel = Resolution / 2;
+        private const int OffsetTexel = CentreTexel + 4;
+        private const float PropagationEpsilon = 1e-4f;
+
+        private const float ImpulseRadiusUv = 0.1f;
+        private const float ImpulseStrength = 1f;
+        private const float Damping = 0.99f;
+        private const float PropagationSpeed = 0.4f;
 
         [UnityTest]
-        public IEnumerator DiagnosticKernel_ClimbsByIncrement_ProvingPingPongAndSwap()
+        public IEnumerator RippleKernels_SpreadAndDecayADrop_ProvingTheSim()
         {
             if (!SystemInfo.supportsComputeShaders)
             {
                 Assert.Ignore("Compute shaders are unsupported on this device.");
             }
 
-            var compute = Resources.Load<ComputeShader>(WaterFieldShaderIds.DiagnosticComputeResourcePath);
-            Assert.IsNotNull(compute, "Diagnostic compute shader missing from Resources.");
-            int kernel = compute.FindKernel(WaterFieldShaderIds.DiagnosticKernelName);
+            var compute = Resources.Load<ComputeShader>(WaterFieldShaderIds.RippleComputeResourcePath);
+            Assert.IsNotNull(compute, "Ripple compute shader missing from Resources.");
+            int integrateKernel = compute.FindKernel(WaterFieldShaderIds.IntegrateKernelName);
+            int injectKernel = compute.FindKernel(WaterFieldShaderIds.InjectKernelName);
 
             var descriptor = WaterFieldDescriptorFactory.CreateBounded(
                 Resolution, new[] { WaterLayer.Dynamic });
@@ -40,21 +47,40 @@ namespace AbstractOcclusion.UnifiedWater.PlayTests
             ClearToZero(field.Read(WaterLayer.Dynamic));
             ClearToZero(field.Write(WaterLayer.Dynamic));
 
-            int groupsPerAxis = Resolution / WaterFieldConstants.SimThreadGroupSize;
-            for (int frame = 0; frame < FrameCount; frame++)
+            int groups = Resolution / WaterFieldConstants.SimThreadGroupSize;
+
+            using (var impulses = new ComputeBuffer(1, sizeof(float) * 4))
             {
-                compute.SetTexture(kernel, WaterFieldShaderIds.ReadField, field.Read(WaterLayer.Dynamic));
-                compute.SetTexture(kernel, WaterFieldShaderIds.WriteField, field.Write(WaterLayer.Dynamic));
-                compute.SetFloat(WaterFieldShaderIds.Increment, Increment);
+                impulses.SetData(new[] { new Vector4(0.5f, 0.5f, ImpulseRadiusUv, ImpulseStrength) });
+
+                // Seed the drop directly into the read buffer via an in-place inject.
+                compute.SetTexture(injectKernel, WaterFieldShaderIds.WriteField, field.Read(WaterLayer.Dynamic));
+                compute.SetBuffer(injectKernel, WaterFieldShaderIds.Impulses, impulses);
+                compute.SetInt(WaterFieldShaderIds.ImpulseCount, 1);
+                compute.SetInt(WaterFieldShaderIds.Resolution, Resolution);
                 compute.SetInt(WaterFieldShaderIds.CascadeCount, CascadeCount);
-                compute.Dispatch(kernel, groupsPerAxis, groupsPerAxis, CascadeCount);
+                compute.Dispatch(injectKernel, groups, groups, CascadeCount);
+            }
+
+            float seededCentre = SampleRed(field.Read(WaterLayer.Dynamic), CentreTexel, CentreTexel);
+            Assert.Greater(seededCentre, PropagationEpsilon, "Inject kernel did not seed a drop.");
+
+            for (int step = 0; step < IntegrateSteps; step++)
+            {
+                compute.SetTexture(integrateKernel, WaterFieldShaderIds.ReadField, field.Read(WaterLayer.Dynamic));
+                compute.SetTexture(integrateKernel, WaterFieldShaderIds.WriteField, field.Write(WaterLayer.Dynamic));
+                compute.SetFloat(WaterFieldShaderIds.RippleDamping, Damping);
+                compute.SetFloat(WaterFieldShaderIds.PropagationSpeed, PropagationSpeed);
+                compute.SetInt(WaterFieldShaderIds.Resolution, Resolution);
+                compute.SetInt(WaterFieldShaderIds.CascadeCount, CascadeCount);
+                compute.Dispatch(integrateKernel, groups, groups, CascadeCount);
                 field.Swap(WaterLayer.Dynamic);
                 yield return null;
             }
 
-            float value = ReadFirstTexelRed(field.Read(WaterLayer.Dynamic));
-            Assert.AreEqual(FrameCount * Increment, value, Tolerance,
-                "Dynamic layer did not climb by increment*frames — ping-pong or swap is broken.");
+            float spreadValue = SampleRed(field.Read(WaterLayer.Dynamic), OffsetTexel, CentreTexel);
+            Assert.Greater(Mathf.Abs(spreadValue), PropagationEpsilon,
+                "Drop did not propagate outward — integrate, ping-pong, or swap is broken.");
         }
 
         private static void ClearToZero(RenderTexture target)
@@ -65,8 +91,8 @@ namespace AbstractOcclusion.UnifiedWater.PlayTests
             RenderTexture.active = previous;
         }
 
-        // Copies slice 0 of the array target into a plain 2D float texture and reads its first texel.
-        private static float ReadFirstTexelRed(RenderTexture arraySource)
+        // Copies slice 0 of the array target to a plain 2D float texture and reads one texel's red.
+        private static float SampleRed(RenderTexture arraySource, int x, int y)
         {
             var temp = new RenderTexture(arraySource.width, arraySource.height, 0, RenderTextureFormat.ARGBFloat);
             temp.Create();
@@ -79,7 +105,7 @@ namespace AbstractOcclusion.UnifiedWater.PlayTests
             pixels.Apply();
             RenderTexture.active = previous;
 
-            float red = pixels.GetPixel(0, 0).r;
+            float red = pixels.GetPixel(x, y).r;
 
             Object.DestroyImmediate(pixels);
             temp.Release();

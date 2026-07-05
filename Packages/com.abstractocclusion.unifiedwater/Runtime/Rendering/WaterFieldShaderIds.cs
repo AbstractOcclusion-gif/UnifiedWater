@@ -13,6 +13,11 @@ namespace AbstractOcclusion.UnifiedWater
         internal const string DiagnosticComputeResourcePath = "AbstractOcclusion/UnifiedWater/WaterFieldDiagnostics";
         internal const string DiagnosticKernelName = "CsAdvanceDiagnostic";
 
+        // Ripple simulation compute shader and its two kernels.
+        internal const string RippleComputeResourcePath = "AbstractOcclusion/UnifiedWater/WaterRipple";
+        internal const string IntegrateKernelName = "CsIntegrate";
+        internal const string InjectKernelName = "CsInject";
+
         // Debug-view shader, sampled to blit one field layer slice to the screen.
         internal const string DebugViewShaderName = "Hidden/AbstractOcclusion/UnifiedWater/WaterFieldDebug";
 
@@ -20,6 +25,12 @@ namespace AbstractOcclusion.UnifiedWater
         internal static readonly int WriteField = Shader.PropertyToID("_WriteField");
         internal static readonly int Increment = Shader.PropertyToID("_Increment");
         internal static readonly int CascadeCount = Shader.PropertyToID("_CascadeCount");
+
+        internal static readonly int RippleDamping = Shader.PropertyToID("_RippleDamping");
+        internal static readonly int PropagationSpeed = Shader.PropertyToID("_PropagationSpeed");
+        internal static readonly int Resolution = Shader.PropertyToID("_Resolution");
+        internal static readonly int Impulses = Shader.PropertyToID("_Impulses");
+        internal static readonly int ImpulseCount = Shader.PropertyToID("_ImpulseCount");
 
         internal static readonly int DebugField = Shader.PropertyToID("_DebugField");
         internal static readonly int DebugValueScale = Shader.PropertyToID("_DebugValueScale");
