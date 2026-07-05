@@ -28,6 +28,10 @@ namespace AbstractOcclusion.UnifiedWater
 
         internal RenderTexture Write(WaterLayer layer) => TargetOf(layer).Write;
 
+        internal RTHandle ReadHandle(WaterLayer layer) => TargetOf(layer).ReadHandle;
+
+        internal RTHandle WriteHandle(WaterLayer layer) => TargetOf(layer).WriteHandle;
+
         internal void Swap(WaterLayer layer) => TargetOf(layer).Swap();
 
         public void Dispose()

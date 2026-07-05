@@ -33,14 +33,22 @@ namespace AbstractOcclusion.UnifiedWater
 
         private static void ValidateResolution(int resolution)
         {
-            // Only generic bounds are enforced here. Layer-specific constraints (power-of-two
-            // for FFT waves, a multiple of the sim thread-group for the ripple layer) belong to
-            // the provider that owns the layer; the port's WaterQuality already rounds sim size.
             if (resolution < WaterFieldConstants.MinResolution || resolution > WaterFieldConstants.MaxResolution)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(resolution), resolution,
                     $"Resolution must be within [{WaterFieldConstants.MinResolution}, {WaterFieldConstants.MaxResolution}].");
+            }
+
+            // Every field layer is written by compute kernels that dispatch in fixed square tiles,
+            // so a resolution that is not a whole multiple of the tile would leave an unwritten edge
+            // strip. Enforced here, once, rather than trusting each provider to re-check it.
+            if (resolution % WaterFieldConstants.SimThreadGroupSize != 0)
+            {
+                throw new ArgumentException(
+                    $"Resolution {resolution} must be a multiple of the compute tile size " +
+                    $"{WaterFieldConstants.SimThreadGroupSize}.",
+                    nameof(resolution));
             }
         }
 

@@ -1,0 +1,31 @@
+// Diagnostic kernel: proves the import -> ping-pong -> swap plumbing before the real ripple sim.
+// It reads the previous frame's Dynamic value and writes value + increment, so a correctly
+// ping-ponged field climbs by a fixed amount each frame — observable in the debug view and asserted
+// by the play-mode test. Replaced by the real ripple kernels in the next increment.
+
+#pragma kernel CsAdvanceDiagnostic
+
+// numthreads edge mirrors WaterFieldConstants.SimThreadGroupSize (8). A shader literal is
+// unavoidable here; the C# side enforces that field resolution is a whole multiple of it.
+#define THREAD_GROUP_SIZE 8
+
+// Bound as UAVs (the field textures allow random write), so both can be indexed directly. The read
+// and write handles address different ping-pong textures, so reading and writing in one dispatch is
+// race-free for the double-buffered Dynamic layer.
+RWTexture2DArray<float4> _ReadField;
+RWTexture2DArray<float4> _WriteField;
+
+float _Increment;
+int _CascadeCount;
+
+[numthreads(THREAD_GROUP_SIZE, THREAD_GROUP_SIZE, 1)]
+void CsAdvanceDiagnostic(uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.z >= _CascadeCount)
+    {
+        return;
+    }
+
+    float4 previous = _ReadField[id];
+    _WriteField[id] = previous + _Increment;
+}

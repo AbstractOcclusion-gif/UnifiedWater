@@ -33,6 +33,14 @@ namespace AbstractOcclusion.UnifiedWater.Tests
         }
 
         [Test]
+        public void Descriptor_Rejects_ResolutionNotMultipleOfThreadGroup()
+        {
+            // 100 is within the allowed range but not a whole multiple of the 8-texel compute tile.
+            Assert.Throws<ArgumentException>(() =>
+                new WaterFieldDescriptor(100, 1, Layers(WaterLayer.Dynamic)));
+        }
+
+        [Test]
         public void Descriptor_Rejects_EmptyLayers()
         {
             Assert.Throws<ArgumentException>(() =>
@@ -81,7 +89,93 @@ namespace AbstractOcclusion.UnifiedWater.Tests
         public void Domain_Rejects_NullTier()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                new WaterDomain(null, Layers(WaterLayer.Dynamic)));
+                new WaterDomain(null, new IWaterFieldProvider[] { new FakeProvider(0, WaterLayer.Dynamic) }));
+        }
+
+        [Test]
+        public void OrderProviders_Rejects_NullSet()
+        {
+            Assert.Throws<ArgumentNullException>(() => WaterDomain.OrderProviders(null));
+        }
+
+        [Test]
+        public void OrderProviders_Rejects_EmptySet()
+        {
+            Assert.Throws<ArgumentException>(() =>
+                WaterDomain.OrderProviders(Array.Empty<IWaterFieldProvider>()));
+        }
+
+        [Test]
+        public void OrderProviders_Rejects_NullEntry()
+        {
+            Assert.Throws<ArgumentException>(() =>
+                WaterDomain.OrderProviders(new IWaterFieldProvider[] { null }));
+        }
+
+        [Test]
+        public void OrderProviders_Rejects_ProviderWithNoLayers()
+        {
+            Assert.Throws<ArgumentException>(() =>
+                WaterDomain.OrderProviders(new IWaterFieldProvider[] { new FakeProvider(0) }));
+        }
+
+        [Test]
+        public void OrderProviders_SortsByWriteOrder()
+        {
+            var later = new FakeProvider(5, WaterLayer.Depth);
+            var earlier = new FakeProvider(1, WaterLayer.Dynamic);
+
+            var ordered = WaterDomain.OrderProviders(new IWaterFieldProvider[] { later, earlier });
+
+            Assert.AreSame(earlier, ordered[0]);
+            Assert.AreSame(later, ordered[1]);
+        }
+
+        [Test]
+        public void DeriveFieldLayers_UnionsAndDedupesSharedLayer()
+        {
+            // Ripple integration and obstacle injection both write Dynamic (an ordered write-chain);
+            // the field still allocates Dynamic once, then Depth.
+            var providers = new IWaterFieldProvider[]
+            {
+                new FakeProvider(0, WaterLayer.Dynamic),
+                new FakeProvider(1, WaterLayer.Dynamic),
+                new FakeProvider(2, WaterLayer.Depth)
+            };
+
+            var layers = WaterDomain.DeriveFieldLayers(providers);
+
+            CollectionAssert.AreEqual(new[] { WaterLayer.Dynamic, WaterLayer.Depth }, layers);
+        }
+
+        /// <summary>
+        /// Minimal <see cref="IWaterFieldProvider"/> stand-in for pure-logic tests: declares layers
+        /// and a write position without allocating any GPU resource.
+        /// </summary>
+        private sealed class FakeProvider : IWaterFieldProvider
+        {
+            private readonly IReadOnlyList<WaterLayer> _writtenLayers;
+
+            internal FakeProvider(int writeOrder, params WaterLayer[] writtenLayers)
+            {
+                WriteOrder = writeOrder;
+                _writtenLayers = writtenLayers;
+            }
+
+            public IReadOnlyList<WaterLayer> WrittenLayers => _writtenLayers;
+            public int WriteOrder { get; }
+
+            public void Setup(WaterFieldDescriptor descriptor)
+            {
+            }
+
+            public void RecordPasses(in WaterFieldFrame frame)
+            {
+            }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

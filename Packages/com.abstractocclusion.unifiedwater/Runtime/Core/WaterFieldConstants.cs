@@ -16,6 +16,13 @@ namespace AbstractOcclusion.UnifiedWater
         internal const int MinCascadeCount = 1;
         internal const int MaxCascadeCount = 8;
 
+        /// <summary>
+        /// Square thread-group edge of every field compute kernel (an 8x8 tile). Field resolution
+        /// must be a whole multiple of this so a dispatch covers the texture exactly, with no
+        /// partial edge group. The value is shared by every kernel — one tile size, one constant.
+        /// </summary>
+        internal const int SimThreadGroupSize = 8;
+
         /// <summary>A bounded domain (pond/pool/lake) is the depth-1 case of the cascade system.</summary>
         internal const int BoundedCascadeCount = 1;
 

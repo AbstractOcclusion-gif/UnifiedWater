@@ -1,7 +1,10 @@
 {
     "name": "AbstractOcclusion.UnifiedWater",
     "rootNamespace": "AbstractOcclusion.UnifiedWater",
-    "references": [],
+    "references": [
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

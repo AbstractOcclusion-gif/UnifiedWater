@@ -3,4 +3,5 @@
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="AbstractOcclusion.UnifiedWater.Tests.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="AbstractOcclusion.UnifiedWater.PlayTests.csproj" />
 </Solution>
