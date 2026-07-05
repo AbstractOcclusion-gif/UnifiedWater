@@ -97,5 +97,5 @@ MonoBehaviour:
   m_Name: WaterRendererFeature
   m_EditorClassIdentifier: AbstractOcclusion.UnifiedWater::AbstractOcclusion.UnifiedWater.WaterRendererFeature
   m_Active: 1
-  showDebugView: 1
+  showDebugView: 0
   debugValueScale: 0.5
