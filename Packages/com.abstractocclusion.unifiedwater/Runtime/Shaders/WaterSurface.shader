@@ -9,8 +9,9 @@ Shader "AbstractOcclusion/UnifiedWater/WaterSurface"
         _EdgeFade ("Edge Fade (m)", Range(0.01, 3.0)) = 0.5
         _SpecularColor ("Specular Color", Color) = (1.0, 1.0, 1.0, 1.0)
         _Smoothness ("Specular Smoothness", Range(1.0, 256.0)) = 64.0
-        _FresnelColor ("Fresnel Color", Color) = (0.6, 0.8, 0.9, 1.0)
         _FresnelPower ("Fresnel Power", Range(0.5, 10.0)) = 5.0
+        _ReflectionStrength ("Reflection Strength", Range(0.0, 1.0)) = 1.0
+        _ReflectionSmoothness ("Reflection Smoothness", Range(0.0, 1.0)) = 0.9
     }
 
     SubShader
@@ -50,8 +51,9 @@ Shader "AbstractOcclusion/UnifiedWater/WaterSurface"
                 float _EdgeFade;
                 float4 _SpecularColor;
                 float _Smoothness;
-                float4 _FresnelColor;
                 float _FresnelPower;
+                float _ReflectionStrength;
+                float _ReflectionSmoothness;
             CBUFFER_END
 
             struct Attributes
@@ -121,12 +123,19 @@ Shader "AbstractOcclusion/UnifiedWater/WaterSurface"
                 float specularTerm = pow(saturate(dot(normalWS, halfDir)), _Smoothness);
                 float3 specular = _SpecularColor.rgb * lightColor * specularTerm;
 
-                float fresnel = pow(1.0 - saturate(dot(normalWS, viewDirWS)), _FresnelPower);
-                float3 rim = _FresnelColor.rgb * fresnel;
+                // Environment reflection (probe + sky) along the view reflection off the rippled surface.
+                float3 reflectVector = reflect(-viewDirWS, normalWS);
+                half perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(_ReflectionSmoothness);
+                float3 reflection = GlossyEnvironmentReflection(
+                    reflectVector, input.positionWS, perceptualRoughness, 1.0);
 
-                // Fade the surface highlights to nothing at the shoreline so the waterline has no seam.
+                // Fresnel drives the mix: look straight down and you see into the water, graze it and it
+                // mirrors the sky. Fade both the reflection and the highlights out at the shoreline.
+                float fresnel = pow(1.0 - saturate(dot(normalWS, viewDirWS)), _FresnelPower);
                 float shoreFade = saturate(waterDepth / _EdgeFade);
-                float3 color = body + (specular + rim) * shoreFade;
+                float reflectionAmount = saturate(fresnel * _ReflectionStrength) * shoreFade;
+
+                float3 color = lerp(body, reflection, reflectionAmount) + specular * shoreFade;
                 return half4(color, 1.0);
             }
             ENDHLSL
