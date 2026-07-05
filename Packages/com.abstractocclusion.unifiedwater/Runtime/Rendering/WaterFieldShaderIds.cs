@@ -18,6 +18,10 @@ namespace AbstractOcclusion.UnifiedWater
         internal const string IntegrateKernelName = "CsIntegrate";
         internal const string InjectKernelName = "CsInject";
 
+        // Wave compose compute shader: derives SurfaceNormalFoam from the Dynamic height field.
+        internal const string ComposeComputeResourcePath = "AbstractOcclusion/UnifiedWater/WaterCompose";
+        internal const string ComposeKernelName = "CsCompose";
+
         // Debug-view shader, sampled to blit one field layer slice to the screen.
         internal const string DebugViewShaderName = "Hidden/AbstractOcclusion/UnifiedWater/WaterFieldDebug";
 
@@ -31,6 +35,9 @@ namespace AbstractOcclusion.UnifiedWater
         internal static readonly int Resolution = Shader.PropertyToID("_Resolution");
         internal static readonly int Impulses = Shader.PropertyToID("_Impulses");
         internal static readonly int ImpulseCount = Shader.PropertyToID("_ImpulseCount");
+
+        internal static readonly int DynamicField = Shader.PropertyToID("_DynamicField");
+        internal static readonly int NormalFoamField = Shader.PropertyToID("_NormalFoamField");
 
         internal static readonly int DebugField = Shader.PropertyToID("_DebugField");
         internal static readonly int DebugValueScale = Shader.PropertyToID("_DebugValueScale");

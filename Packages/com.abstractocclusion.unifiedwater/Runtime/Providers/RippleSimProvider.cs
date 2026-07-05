@@ -76,8 +76,14 @@ namespace AbstractOcclusion.UnifiedWater
             var write = frame.WriteHandle(WaterLayer.Dynamic);
             int groupsPerAxis = frame.Resolution / WaterFieldConstants.SimThreadGroupSize;
 
+            // Inject queued drops once, into the current state, so a single click is one drop that
+            // then propagates through every substep this frame — not one drop per substep.
+            if (frame.IsFirstSubstep)
+            {
+                RecordInject(frame.RenderGraph, read, groupsPerAxis);
+            }
+
             RecordIntegrate(frame.RenderGraph, read, write, groupsPerAxis);
-            RecordInject(frame.RenderGraph, write, groupsPerAxis);
         }
 
         public void Dispose()
@@ -109,7 +115,8 @@ namespace AbstractOcclusion.UnifiedWater
             builder.SetRenderFunc<IntegratePassData>(ExecuteIntegrate);
         }
 
-        private void RecordInject(RenderGraph renderGraph, TextureHandle write, int groupsPerAxis)
+        // Read-modify-writes the current state buffer, adding queued drops before it is integrated.
+        private void RecordInject(RenderGraph renderGraph, TextureHandle target, int groupsPerAxis)
         {
             if (_pendingImpulses.Count == 0)
             {
@@ -132,14 +139,14 @@ namespace AbstractOcclusion.UnifiedWater
 
             passData.Compute = _compute;
             passData.Kernel = _injectKernel;
-            passData.Write = write;
+            passData.Target = target;
             passData.GroupsPerAxis = groupsPerAxis;
             passData.Resolution = _resolution;
             passData.CascadeCount = _cascadeCount;
             passData.Impulses = _impulseBuffer;
             passData.ImpulseCount = count;
 
-            builder.UseTexture(write, AccessFlags.ReadWrite);
+            builder.UseTexture(target, AccessFlags.ReadWrite);
             builder.SetRenderFunc<InjectPassData>(ExecuteInject);
         }
 
@@ -159,7 +166,7 @@ namespace AbstractOcclusion.UnifiedWater
         private static void ExecuteInject(InjectPassData data, ComputeGraphContext context)
         {
             var cmd = context.cmd;
-            cmd.SetComputeTextureParam(data.Compute, data.Kernel, WaterFieldShaderIds.WriteField, data.Write);
+            cmd.SetComputeTextureParam(data.Compute, data.Kernel, WaterFieldShaderIds.WriteField, data.Target);
             cmd.SetComputeBufferParam(data.Compute, data.Kernel, WaterFieldShaderIds.Impulses, data.Impulses);
             cmd.SetComputeIntParam(data.Compute, WaterFieldShaderIds.ImpulseCount, data.ImpulseCount);
             cmd.SetComputeIntParam(data.Compute, WaterFieldShaderIds.Resolution, data.Resolution);
@@ -185,7 +192,7 @@ namespace AbstractOcclusion.UnifiedWater
         {
             internal ComputeShader Compute;
             internal int Kernel;
-            internal TextureHandle Write;
+            internal TextureHandle Target;
             internal int GroupsPerAxis;
             internal int Resolution;
             internal int CascadeCount;

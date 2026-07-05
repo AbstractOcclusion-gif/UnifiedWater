@@ -54,7 +54,8 @@ MonoBehaviour:
     probeVolumeBlendStatesCS: {fileID: 0}
   m_RendererFeatures:
   - {fileID: -1878332245247344467}
-  m_RendererFeatureMap: adc0de57c6d2eee5
+  - {fileID: 5345777003435923778}
+  m_RendererFeatureMap: adc0de57c6d2eee54219408adc03304a
   m_UseNativeRenderPass: 0
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -83,3 +84,18 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 1
+--- !u!114 &5345777003435923778
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5bbb7f05695e818439d00ae4d0bf9ce0, type: 3}
+  m_Name: WaterRendererFeature
+  m_EditorClassIdentifier: AbstractOcclusion.UnifiedWater::AbstractOcclusion.UnifiedWater.WaterRendererFeature
+  m_Active: 1
+  showDebugView: 1
+  debugValueScale: 0.5

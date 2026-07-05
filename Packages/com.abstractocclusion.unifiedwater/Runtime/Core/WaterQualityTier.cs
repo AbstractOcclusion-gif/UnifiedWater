@@ -28,10 +28,17 @@ namespace AbstractOcclusion.UnifiedWater
         [Range(WaterSimConstants.MinPropagationSpeed, WaterSimConstants.MaxPropagationSpeed)]
         private float propagationSpeed = WaterSimConstants.DefaultPropagationSpeed;
 
+        [Tooltip("Fixed timestep of the ripple sim, in seconds. Smaller is more accurate but costlier.")]
+        [SerializeField]
+        [Range(WaterSimConstants.MinFixedDeltaTime, WaterSimConstants.MaxFixedDeltaTime)]
+        private float simFixedDeltaTime = WaterSimConstants.DefaultFixedDeltaTime;
+
         public int FieldResolution => fieldResolution;
 
         internal float RippleDamping => rippleDamping;
 
         internal float PropagationSpeed => propagationSpeed;
+
+        internal float SimFixedDeltaTime => simFixedDeltaTime;
     }
 }

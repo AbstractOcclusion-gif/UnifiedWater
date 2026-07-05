@@ -5,36 +5,66 @@ using UnityEngine.Rendering.RenderGraphModule;
 namespace AbstractOcclusion.UnifiedWater
 {
     /// <summary>
-    /// One frame's render-graph view of a domain's field, handed to each provider so it records its
-    /// passes against layer handles the controller already imported. Importing every layer once, in
-    /// the controller, means a shared-layer write-chain (ripple integrate then obstacle inject) sees
-    /// one consistent read/write pair rather than importing the same persistent texture twice.
+    /// One substep's render-graph view of a domain's field. The controller imports each layer's
+    /// buffers once per frame; this view then presents the correct read and write handles for the
+    /// current substep. For a double-buffered layer the two imported buffers swap roles each substep
+    /// (parity on <see cref="SubstepIndex"/>), so a provider always reads the current state and writes
+    /// the next without the field being re-imported mid-frame.
     /// </summary>
     internal readonly struct WaterFieldFrame
     {
-        private readonly IReadOnlyDictionary<WaterLayer, LayerHandles> _handles;
+        private readonly IReadOnlyDictionary<WaterLayer, BaseHandles> _handles;
 
         internal RenderGraph RenderGraph { get; }
         internal int Resolution { get; }
         internal int CascadeCount { get; }
+        internal int SubstepIndex { get; }
+        internal int SubstepCount { get; }
+
+        internal bool IsFirstSubstep => SubstepIndex == 0;
+        internal bool IsLastSubstep => SubstepIndex == SubstepCount - 1;
 
         internal WaterFieldFrame(
             RenderGraph renderGraph,
-            IReadOnlyDictionary<WaterLayer, LayerHandles> handles,
+            IReadOnlyDictionary<WaterLayer, BaseHandles> handles,
             int resolution,
-            int cascadeCount)
+            int cascadeCount,
+            int substepIndex,
+            int substepCount)
         {
             RenderGraph = renderGraph;
             _handles = handles;
             Resolution = resolution;
             CascadeCount = cascadeCount;
+            SubstepIndex = substepIndex;
+            SubstepCount = substepCount;
         }
 
-        internal TextureHandle ReadHandle(WaterLayer layer) => Resolve(layer).Read;
+        internal TextureHandle ReadHandle(WaterLayer layer)
+        {
+            var handles = Resolve(layer);
+            if (!handles.DoubleBuffered)
+            {
+                return handles.FrameStartRead;
+            }
 
-        internal TextureHandle WriteHandle(WaterLayer layer) => Resolve(layer).Write;
+            return IsEvenSubstep ? handles.FrameStartRead : handles.FrameStartWrite;
+        }
 
-        private LayerHandles Resolve(WaterLayer layer)
+        internal TextureHandle WriteHandle(WaterLayer layer)
+        {
+            var handles = Resolve(layer);
+            if (!handles.DoubleBuffered)
+            {
+                return handles.FrameStartRead;
+            }
+
+            return IsEvenSubstep ? handles.FrameStartWrite : handles.FrameStartRead;
+        }
+
+        private bool IsEvenSubstep => (SubstepIndex & 1) == 0;
+
+        private BaseHandles Resolve(WaterLayer layer)
         {
             if (_handles.TryGetValue(layer, out var handles))
             {
@@ -46,16 +76,21 @@ namespace AbstractOcclusion.UnifiedWater
                 nameof(layer));
         }
 
-        /// <summary>The imported read and write handles for one layer. Equal for a single-buffered layer.</summary>
-        internal readonly struct LayerHandles
+        /// <summary>
+        /// A layer's two imported buffers as they stood at the start of the frame. For a
+        /// single-buffered layer both roles resolve to <see cref="FrameStartRead"/>.
+        /// </summary>
+        internal readonly struct BaseHandles
         {
-            internal TextureHandle Read { get; }
-            internal TextureHandle Write { get; }
+            internal TextureHandle FrameStartRead { get; }
+            internal TextureHandle FrameStartWrite { get; }
+            internal bool DoubleBuffered { get; }
 
-            internal LayerHandles(TextureHandle read, TextureHandle write)
+            internal BaseHandles(TextureHandle frameStartRead, TextureHandle frameStartWrite, bool doubleBuffered)
             {
-                Read = read;
-                Write = write;
+                FrameStartRead = frameStartRead;
+                FrameStartWrite = frameStartWrite;
+                DoubleBuffered = doubleBuffered;
             }
         }
     }

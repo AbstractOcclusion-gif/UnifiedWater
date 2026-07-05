@@ -83,6 +83,58 @@ namespace AbstractOcclusion.UnifiedWater.PlayTests
                 "Drop did not propagate outward — integrate, ping-pong, or swap is broken.");
         }
 
+        [UnityTest]
+        public IEnumerator ComposeKernel_DerivesNonFlatNormal_WhereHeightSlopes()
+        {
+            if (!SystemInfo.supportsComputeShaders)
+            {
+                Assert.Ignore("Compute shaders are unsupported on this device.");
+            }
+
+            var ripple = Resources.Load<ComputeShader>(WaterFieldShaderIds.RippleComputeResourcePath);
+            var compose = Resources.Load<ComputeShader>(WaterFieldShaderIds.ComposeComputeResourcePath);
+            Assert.IsNotNull(ripple, "Ripple compute shader missing from Resources.");
+            Assert.IsNotNull(compose, "Compose compute shader missing from Resources.");
+            int injectKernel = ripple.FindKernel(WaterFieldShaderIds.InjectKernelName);
+            int composeKernel = compose.FindKernel(WaterFieldShaderIds.ComposeKernelName);
+
+            var descriptor = WaterFieldDescriptorFactory.CreateBounded(
+                Resolution, new[] { WaterLayer.Dynamic, WaterLayer.SurfaceNormalFoam });
+            using var field = new WaterField(descriptor);
+
+            ClearToZero(field.Read(WaterLayer.Dynamic));
+            ClearToZero(field.Write(WaterLayer.Dynamic));
+            ClearToZero(field.Write(WaterLayer.SurfaceNormalFoam));
+
+            int groups = Resolution / WaterFieldConstants.SimThreadGroupSize;
+
+            using (var impulses = new ComputeBuffer(1, sizeof(float) * 4))
+            {
+                impulses.SetData(new[] { new Vector4(0.5f, 0.5f, ImpulseRadiusUv, ImpulseStrength) });
+                ripple.SetTexture(injectKernel, WaterFieldShaderIds.WriteField, field.Read(WaterLayer.Dynamic));
+                ripple.SetBuffer(injectKernel, WaterFieldShaderIds.Impulses, impulses);
+                ripple.SetInt(WaterFieldShaderIds.ImpulseCount, 1);
+                ripple.SetInt(WaterFieldShaderIds.Resolution, Resolution);
+                ripple.SetInt(WaterFieldShaderIds.CascadeCount, CascadeCount);
+                ripple.Dispatch(injectKernel, groups, groups, CascadeCount);
+            }
+
+            yield return null;
+
+            compose.SetTexture(composeKernel, WaterFieldShaderIds.DynamicField, field.Read(WaterLayer.Dynamic));
+            compose.SetTexture(composeKernel, WaterFieldShaderIds.NormalFoamField, field.Write(WaterLayer.SurfaceNormalFoam));
+            compose.SetInt(WaterFieldShaderIds.Resolution, Resolution);
+            compose.SetInt(WaterFieldShaderIds.CascadeCount, CascadeCount);
+            compose.Dispatch(composeKernel, groups, groups, CascadeCount);
+
+            yield return null;
+
+            // One texel off the peak the height slopes, so the derived normal must tilt (nx != 0).
+            float normalX = SampleRed(field.Read(WaterLayer.SurfaceNormalFoam), CentreTexel + 1, CentreTexel);
+            Assert.Greater(Mathf.Abs(normalX), PropagationEpsilon,
+                "Compose produced a flat normal where the height field has a slope.");
+        }
+
         private static void ClearToZero(RenderTexture target)
         {
             var previous = RenderTexture.active;
@@ -91,10 +143,14 @@ namespace AbstractOcclusion.UnifiedWater.PlayTests
             RenderTexture.active = previous;
         }
 
-        // Copies slice 0 of the array target to a plain 2D float texture and reads one texel's red.
+        // Copies slice 0 of the array target to a plain 2D texture (matching the source format) and
+        // reads one texel's red channel.
         private static float SampleRed(RenderTexture arraySource, int x, int y)
         {
-            var temp = new RenderTexture(arraySource.width, arraySource.height, 0, RenderTextureFormat.ARGBFloat);
+            var descriptor = arraySource.descriptor;
+            descriptor.dimension = TextureDimension.Tex2D;
+            descriptor.volumeDepth = 1;
+            var temp = new RenderTexture(descriptor);
             temp.Create();
             Graphics.CopyTexture(arraySource, 0, 0, temp, 0, 0);
 

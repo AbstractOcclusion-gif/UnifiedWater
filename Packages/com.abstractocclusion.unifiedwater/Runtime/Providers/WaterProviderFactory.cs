@@ -12,7 +12,11 @@ namespace AbstractOcclusion.UnifiedWater
     {
         internal static IReadOnlyList<IWaterFieldProvider> Create(WaterQualityTier tier)
         {
-            return new IWaterFieldProvider[] { new RippleSimProvider(tier) };
+            return new IWaterFieldProvider[]
+            {
+                new RippleSimProvider(tier),
+                new WaveComposeProvider()
+            };
         }
     }
 }

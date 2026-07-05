@@ -14,6 +14,9 @@ namespace AbstractOcclusion.UnifiedWater
     /// </summary>
     internal sealed class WaterDomain : IDisposable
     {
+        private readonly FixedStepAccumulator _simClock;
+        private int _pendingSubsteps;
+
         internal WaterField Field { get; }
 
         /// <summary>The domain's world footprint and world↔texel mapping.</summary>
@@ -34,12 +37,34 @@ namespace AbstractOcclusion.UnifiedWater
 
             Extent = extent;
             Providers = OrderProviders(providers);
+            _simClock = new FixedStepAccumulator(tier.SimFixedDeltaTime, WaterSimConstants.MaxSubstepsPerFrame);
 
             var layers = DeriveFieldLayers(Providers);
             var descriptor = WaterFieldDescriptorFactory.CreateBounded(tier.FieldResolution, layers);
             Field = new WaterField(descriptor);
 
             SetupProviders(Providers, descriptor);
+        }
+
+        /// <summary>
+        /// Advances the sim clock by one frame of real time, banking the fixed steps now due. Called
+        /// once per frame on the main thread (never during rendering) so the step count is decided
+        /// before any camera records the graph.
+        /// </summary>
+        internal void Advance(float realDeltaTime)
+        {
+            _pendingSubsteps = _simClock.Advance(realDeltaTime);
+        }
+
+        /// <summary>
+        /// Returns the fixed steps banked for this frame and clears them, so exactly one render
+        /// consumes them even when several cameras record the graph.
+        /// </summary>
+        internal int ConsumeSubsteps()
+        {
+            int steps = _pendingSubsteps;
+            _pendingSubsteps = 0;
+            return steps;
         }
 
         /// <summary>

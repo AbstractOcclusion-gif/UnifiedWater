@@ -43,6 +43,11 @@ namespace AbstractOcclusion.UnifiedWater
             _domain.InjectImpulse(new WaterImpulse(centerUv, radiusUv, strength));
         }
 
+        private void Update()
+        {
+            _domain?.Advance(Time.deltaTime);
+        }
+
         private void OnEnable()
         {
             if (tier == null)

@@ -1,0 +1,45 @@
+// Derives the surface normal for the SurfaceNormalFoam layer from the Dynamic height field. This is
+// the single place height gradients become a normal, so the sim itself never stores normals (DRY).
+// Foam and wetness are placeholders (0) until their providers land. Written fresh in our namespace.
+
+#pragma kernel CsCompose
+
+// numthreads edge mirrors WaterFieldConstants.SimThreadGroupSize (8).
+#define THREAD_GROUP_SIZE 8
+
+RWTexture2DArray<float4> _DynamicField;    // height in R
+RWTexture2DArray<float4> _NormalFoamField; // nx, nz, foam, wetness
+
+int _Resolution;
+int _CascadeCount;
+
+int ClampCoord(int coordinate)
+{
+    return clamp(coordinate, 0, _Resolution - 1);
+}
+
+[numthreads(THREAD_GROUP_SIZE, THREAD_GROUP_SIZE, 1)]
+void CsCompose(uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.x >= _Resolution || (int)id.y >= _Resolution || (int)id.z >= _CascadeCount)
+    {
+        return;
+    }
+
+    int x = (int)id.x;
+    int y = (int)id.y;
+    int slice = (int)id.z;
+
+    float heightLeft = _DynamicField[uint3(ClampCoord(x - 1), y, slice)].r;
+    float heightRight = _DynamicField[uint3(ClampCoord(x + 1), y, slice)].r;
+    float heightDown = _DynamicField[uint3(x, ClampCoord(y - 1), slice)].r;
+    float heightUp = _DynamicField[uint3(x, ClampCoord(y + 1), slice)].r;
+
+    // Central-difference gradient; the up vector stays +Y so the normal leans against the slope.
+    float slopeX = (heightRight - heightLeft) * 0.5;
+    float slopeZ = (heightUp - heightDown) * 0.5;
+    float3 normal = normalize(float3(-slopeX, 1.0, -slopeZ));
+
+    // Store the horizontal components; the +Y component is reconstructable by the surface shader.
+    _NormalFoamField[id] = float4(normal.x, normal.z, 0.0, 0.0);
+}

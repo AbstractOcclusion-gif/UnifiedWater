@@ -10,5 +10,6 @@ namespace AbstractOcclusion.UnifiedWater
         internal const int Diagnostic = 0;
         internal const int RippleSim = 100;
         internal const int ObstacleInject = 200;
+        internal const int WaveCompose = 300;
     }
 }
