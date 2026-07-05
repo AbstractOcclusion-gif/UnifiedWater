@@ -1,10 +1,11 @@
 # Unified Water — Architecture Draft 01
 
-**Status:** first draft, for discussion. No implementation code yet.
+**Status:** living design doc. Data spine + descriptor factory are implemented and compiling green; passes and domains are not built yet.
 **Engine:** Unity 6000.3 / URP 17.3, RenderGraph-native.
-**Scope of this draft:** the load-bearing decisions — the Water Field, the domain abstraction, the RenderGraph pass graph, and the module decomposition — plus the constant/enum catalog that keeps the eventual code free of magic numbers and god classes.
+**Standalone:** Unified Water depends on nothing outside itself. The Evan Wallace port, KWS, Crest, RAM, and Stylized Water are **inspiration references only** — we take ideas, never their code (see `Docs/RULES.md`).
+**Scope of this doc:** the load-bearing decisions — the Water Field, the domain abstraction, the RenderGraph pass graph, and the module decomposition — plus the constant/enum catalog that keeps the code free of magic numbers and god classes.
 
-This draft covers **Phase 1 (ponds)** concretely and sketches how Phases 2–4 (ocean, shore, rivers) slot in without a rewrite. It is a design; every Unity/URP API detail gets verified against Crest 5 and the URP 17 docs before any code is written.
+This doc covers **Phase 1 (ponds)** concretely and sketches how Phases 2–4 (ocean, shore, rivers) slot in without a rewrite. Every Unity/URP API detail is verified against the URP 17 docs — cross-checked against how the references solved the same problem — before code is written.
 
 ---
 
@@ -18,7 +19,7 @@ These come from the project coding standards and the lessons of the asset survey
 - **Fail fast at boundaries.** Provider registration, domain configuration, and query calls validate inputs and throw with a clear message rather than silently producing black water.
 - **Minimal public surface.** Only `WaterVolume` (authoring) and `WaterQuery` (gameplay) are public. Providers, passes, and the field are `internal`.
 - **Prefer immutability.** Field descriptors, tier data, and layer metadata are read-only after construction; only the GPU textures mutate.
-- **Reuse, never rewrite.** Where the Evan Wallace port already has a working function, shader, or compute kernel, wrap and reuse it — do not reimplement. New code is written only for genuinely new capability. Providers/passes are thin adapters over existing port code wherever one exists.
+- **DRY — one implementation.** Any calculation or method needed in two places has exactly one implementation that both call (a shared helper), never a second copy. This is internal to our own codebase; we do not import code from the references.
 - **Everything optional, tier-gated.** Every effect (reflection, caustics, god rays, underwater, foam, spectrum, flow) is individually toggleable per domain and gated by the quality tier. A disabled effect contributes no provider, no pass, no allocated layer, and no shader keyword — cost is zero when off.
 
 ---
@@ -31,7 +32,7 @@ Everything hangs off three contracts. Get these right and every feature is a plu
 
 **Providers** (`IWaterFieldProvider`) — anything that *writes* a layer: FFT spectrum, analytic wave bank, ripple sim, obstacle footprints, foam accumulation, depth/SDF, flow. Each declares which layer(s) and which cascade(s) it targets, and contributes one or more RenderGraph passes.
 
-**Consumers + one Query API** (`WaterQuery`) — the surface shaders, buoyancy, and gameplay all *read* the field. Gameplay reads through a single async-readback query with a CPU analytic fallback (grounded in the port's existing `WaterSurfaceSampler` and mirrored in Crest/KWS/Stylized, which all converged here).
+**Consumers + one Query API** (`WaterQuery`) — the surface shaders, buoyancy, and gameplay all *read* the field. Gameplay reads through a single async-readback query with a CPU analytic fallback — the pattern every reference (Crest, KWS, Stylized, the port) independently converged on.
 
 ```
 Providers ──write──▶  Water Field (layer textures)  ──read──▶ Surface shader
@@ -50,7 +51,7 @@ A **Water Domain** is a region of water backed by one field. It comes in two con
 
 Because a pond is literally "a cascade stack of length 1," Phase 2 adds cascades; it does not rewrite Phase 1. The layout strategy owns: cascade count, per-cascade world extent, and recentre/scroll behaviour. The rest of the engine is layout-agnostic.
 
-> This is the explicit fix for the port's core flaw: today's fixed pool-space sim window becomes the finest cascade of a general system.
+> This directly avoids the port experiment's core flaw: rather than a fixed pool-space sim window, a pond is simply the finest cascade of a general system.
 
 ---
 
@@ -61,11 +62,11 @@ Each layer is a `Texture2DArray` with one slice per cascade (Crest/KWS pattern).
 | Layer (enum `WaterLayer`) | Format (proposed) | Channels | Written by | Justification |
 |---|---|---|---|---|
 | `Displacement` | `RGBAHalf` | xyz world displacement, w = fold/Jacobian | FFT + analytic providers | Crest `AnimatedWaves` packs displacement + derived whitecap term |
-| `Dynamic` | `ARGBFloat` | height, velocity, nx, nz | Ripple sim provider | Exactly the port's proven ping-pong sim state; full float needed for the WebGPU mean-conservation fix |
+| `Dynamic` | `ARGBFloat` | height, velocity, nx, nz | Ripple sim provider | Ping-pong height-field state; full float is required for stable mean/volume conservation on WebGPU (a lesson from the experiment) |
 | `SurfaceNormalFoam` | `RGBAHalf` | nx, nz, foamCoverage, wetness | Derived (compose pass) | Combined normal+foam sample keeps the surface shader to one fetch |
 | `Depth` | `RGHalf` | bedDepth, shoreSdf | Depth provider | Crest `DepthLod` + jump-flood SDF for shore |
 | `Flow` | `RGHalf` | flowX, flowZ | Flow provider (Phase 4) | KWS flowmap semantics |
-| `Absorption` | per-body uniform for Phase 1; optional `RGBA32` later | tint + extinction | — | Spatially-uniform first (port already does per-channel Beer-Lambert); spatial variation deferred |
+| `Absorption` | per-body uniform for Phase 1; optional `RGBA32` later | tint + extinction | — | Spatially-uniform first (per-channel Beer-Lambert is enough for ponds); spatial variation deferred |
 
 Notes:
 - `Dynamic` is double-buffered (ping-pong) — it carries state across frames. `Displacement` and `SurfaceNormalFoam` are recomputed each frame. `Depth`/`Flow` are semi-static.
@@ -105,7 +106,7 @@ Each type below is single-responsibility. Contrast the KWS monolith. Namespaces 
 **Data**
 - `WaterField` — owns the layer textures; allocation/resize/lifetime only. No simulation logic.
 - `WaterFieldDescriptor` — immutable: which layers, which formats, cascade count, resolution. Built from the tier + domain.
-- `WaterQualityTier` (ScriptableObject) — the existing tier asset; the single home for all budget numbers (resolutions, cascade count, god-ray steps, foam caps, reflection mode).
+- `WaterQualityTier` (ScriptableObject) — a tier asset written fresh in our namespace; the single home for all budget numbers (resolutions, cascade count, god-ray steps, foam caps, reflection mode).
 
 **Spatial**
 - `WaterDomain` — a region + its field + its cascade strategy. Thin coordinator.
@@ -139,15 +140,13 @@ First-draft home for every literal. Values are placeholders to be tuned; the poi
 - `ReflectionMode { SkyOnly, Planar, ScreenSpace }`
 - `CausticsMode { RealProjected, TexturedFocal }`
 
-**`WaterFieldFormats` (static)** — one named `GraphicsFormat` per layer (Section 4 table). No format literal appears anywhere else.
+**`WaterLayerCatalog` (static, implemented)** — one named `GraphicsFormat` per layer plus each layer's double-buffer flag. No format literal or buffering assumption appears anywhere else.
 
-**`WaterDefaults` (static, per-tier via `WaterQualityTier`)** — every current magic number gets a name here, e.g.:
-- `DynamicFieldResolution` (per tier: e.g. Low/Med/High/Ultra)
-- `CausticsResolution`, `GodRayStepCount`, `FoamMaxCoverage`
-- `RippleDamping`, `RippleDropRadiusScale`, `ObstacleDeadband` (migrated from the port's existing tuned values)
-- `BoundedDomainExtent`, `CascadeCount`, `CascadeExtentScale`
+**`WaterFieldConstants` (static, implemented)** — allocation limits and fixed texture settings: min/max resolution, cascade bounds, `BoundedCascadeCount`, no-MSAA, no-depth, and buffer name suffixes.
 
-**Shader side** — the same names are surfaced as uniforms via a single publisher (mirrors the port's `WaterUniformPublisher`), so no shader hardcodes a constant either. Shader keyword names live in a `WaterKeywords` static class (no hardcoded strings).
+**Per-tier budget numbers** live on the `WaterQualityTier` asset (resolutions, cascade count, god-ray steps, foam caps, reflection mode, and tuned sim values such as ripple damping and obstacle deadband). Tuned fresh here — a reference's published number may be a starting point, but the value lives in our tier asset.
+
+**Shader side** — the same names are surfaced as uniforms via a single publisher, so no shader hardcodes a constant either. Shader keyword names live in a `WaterKeywords` static class (no hardcoded strings).
 
 ---
 
@@ -160,6 +159,8 @@ First-draft home for every literal. Values are placeholders to be tuned; the poi
 
 ---
 
-## 9. Next step
+## 9. Status & next step
 
-On your nod to items 1–4, the natural first code target is the **data spine only**: `WaterLayer`/`WaterFieldFormats`/`WaterFieldDescriptor`/`WaterField` (+ tier fields) with no passes yet — allocatable, testable, zero rendering. That proves the foundation before any pass is written.
+**Done (green):** the data spine — `WaterLayer`, `WaterLayerCatalog`, `WaterFieldConstants`, `WaterFieldDescriptor`, `WaterLayerTarget`, `WaterField` — plus `WaterFieldDescriptorFactory` (encodes bounded pond = depth-1 cascade). All internal, immutable, fail-fast, zero external coupling.
+
+**Next:** make the spine live — a `WaterDomain` that owns a `WaterField`, and a small `WaterQualityTier` written fresh in our namespace to feed the factory. Still no rendering; this yields an allocatable, configurable domain to build the first pass against.

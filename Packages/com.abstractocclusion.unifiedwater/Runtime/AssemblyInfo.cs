@@ -4,4 +4,3 @@ using System.Runtime.CompilerServices;
 // runtime keeps its public surface minimal (see RULES.md: minimize public API).
 [assembly: InternalsVisibleTo("AbstractOcclusion.UnifiedWater.Editor")]
 [assembly: InternalsVisibleTo("AbstractOcclusion.UnifiedWater.Tests")]
-[assembly: InternalsVisibleTo("AbstractOcclusion.UnifiedWater.WebGpuBridge")]

@@ -10,6 +10,9 @@ namespace AbstractOcclusion.UnifiedWater
         internal const int MinResolution = 16;
         internal const int MaxResolution = 2048;
 
+        /// <summary>Balanced default field resolution used when a tier does not specify one.</summary>
+        internal const int DefaultResolution = 256;
+
         internal const int MinCascadeCount = 1;
         internal const int MaxCascadeCount = 8;
 
