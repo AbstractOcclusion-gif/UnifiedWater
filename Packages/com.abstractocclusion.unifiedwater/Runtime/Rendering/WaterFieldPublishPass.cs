@@ -50,6 +50,12 @@ namespace AbstractOcclusion.UnifiedWater
             var dynamicHandle = renderGraph.ImportTexture(field.WriteHandle(WaterLayer.Dynamic));
             var normalFoamHandle = renderGraph.ImportTexture(field.ReadHandle(WaterLayer.SurfaceNormalFoam));
 
+            // The planar reflection is optional — present only when a WaterPlanarReflection component
+            // rendered one this frame. When absent, the surface's sky reflection mode needs nothing here.
+            var reflection = WaterReflectionRegistry.Current;
+            bool hasReflection = reflection != null;
+            TextureHandle reflectionHandle = hasReflection ? renderGraph.ImportTexture(reflection) : default;
+
             using var builder = renderGraph.AddUnsafePass<PassData>(
                 WaterProfilingNames.FieldPublish, out var passData);
 
@@ -57,6 +63,10 @@ namespace AbstractOcclusion.UnifiedWater
 
             builder.SetGlobalTextureAfterPass(dynamicHandle, WaterFieldShaderIds.DynamicGlobal);
             builder.SetGlobalTextureAfterPass(normalFoamHandle, WaterFieldShaderIds.NormalFoamGlobal);
+            if (hasReflection)
+            {
+                builder.SetGlobalTextureAfterPass(reflectionHandle, WaterFieldShaderIds.PlanarReflectionGlobal);
+            }
 
             // Scalar globals go through the command buffer; this allowance permits that, keeps the pass
             // from being culled, and forces it to run before the passes that read the published globals.

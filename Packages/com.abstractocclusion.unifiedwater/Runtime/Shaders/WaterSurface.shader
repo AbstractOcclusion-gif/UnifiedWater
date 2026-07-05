@@ -12,6 +12,7 @@ Shader "AbstractOcclusion/UnifiedWater/WaterSurface"
         _FresnelPower ("Fresnel Power", Range(0.5, 10.0)) = 5.0
         _ReflectionStrength ("Reflection Strength", Range(0.0, 1.0)) = 1.0
         _ReflectionSmoothness ("Reflection Smoothness", Range(0.0, 1.0)) = 0.9
+        [KeywordEnum(Sky, Planar)] _ReflectionMode ("Reflection Mode", Float) = 0
     }
 
     SubShader
@@ -36,6 +37,8 @@ Shader "AbstractOcclusion/UnifiedWater/WaterSurface"
             #pragma vertex Vert
             #pragma fragment Frag
             #pragma target 4.5
+
+            #pragma multi_compile _REFLECTIONMODE_SKY _REFLECTIONMODE_PLANAR
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -123,11 +126,16 @@ Shader "AbstractOcclusion/UnifiedWater/WaterSurface"
                 float specularTerm = pow(saturate(dot(normalWS, halfDir)), _Smoothness);
                 float3 specular = _SpecularColor.rgb * lightColor * specularTerm;
 
-                // Environment reflection (probe + sky) along the view reflection off the rippled surface.
+                // Reflection: sky/probe by default, or the mirrored planar capture when that mode is on.
+                // Planar samples at screen uv wobbled by the ripple normal so the mirror image ripples too.
                 float3 reflectVector = reflect(-viewDirWS, normalWS);
                 half perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(_ReflectionSmoothness);
                 float3 reflection = GlossyEnvironmentReflection(
                     reflectVector, input.positionWS, perceptualRoughness, 1.0);
+            #if defined(_REFLECTIONMODE_PLANAR)
+                float2 reflectionUv = screenUv + normalWS.xz * _RefractionStrength;
+                reflection = UnifiedWater_SamplePlanarReflection(reflectionUv);
+            #endif
 
                 // Fresnel drives the mix: look straight down and you see into the water, graze it and it
                 // mirrors the sky. Fade both the reflection and the highlights out at the shoreline.

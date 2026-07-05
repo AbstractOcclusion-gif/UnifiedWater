@@ -45,4 +45,14 @@ float3 UnifiedWater_SampleNormal(float2 uv)
     return normalize(float3(normalXz.x, normalY, normalXz.y));
 }
 
+// Planar reflection: the mirrored scene capture published by WaterPlanarReflection, a screen-space
+// texture the surface reads at its own screen uv. Present only in the planar reflection mode.
+TEXTURE2D(_UnifiedWater_PlanarReflection);
+SAMPLER(sampler_UnifiedWater_PlanarReflection);
+
+float3 UnifiedWater_SamplePlanarReflection(float2 screenUv)
+{
+    return SAMPLE_TEXTURE2D(_UnifiedWater_PlanarReflection, sampler_UnifiedWater_PlanarReflection, screenUv).rgb;
+}
+
 #endif // UNIFIED_WATER_FIELD_INCLUDED

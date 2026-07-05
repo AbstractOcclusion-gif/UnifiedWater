@@ -50,5 +50,8 @@ namespace AbstractOcclusion.UnifiedWater
         internal static readonly int ExtentCenter = Shader.PropertyToID("_UnifiedWater_Center");
         internal static readonly int ExtentSize = Shader.PropertyToID("_UnifiedWater_Size");
         internal static readonly int ExtentTexelSize = Shader.PropertyToID("_UnifiedWater_TexelSize");
+
+        // Planar reflection: the mirrored scene capture the surface samples in its planar reflection mode.
+        internal static readonly int PlanarReflectionGlobal = Shader.PropertyToID("_UnifiedWater_PlanarReflection");
     }
 }
