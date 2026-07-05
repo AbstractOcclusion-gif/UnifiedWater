@@ -1,0 +1,53 @@
+# ---- Unity generated / regenerable (never commit) ----
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Asset meta files must stay tracked even where their asset is ignored
+!/[Aa]ssets/**/*.meta
+
+# ---- IDE / tooling ----
+.vs/
+.vsconfig
+.idea/
+.gradle/
+ExportedObj/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# ---- Builds / packages ----
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# ---- Crash / diagnostics ----
+sysinfo.txt
+crashlytics-build.properties
+
+# ---- Addressables build output ----
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# ---- OS cruft ----
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,11 @@
+{
+  "name": "com.abstractocclusion.unifiedwater",
+  "version": "0.0.1",
+  "displayName": "AbstractOcclusion.UnifiedWater",
+  "description": "Unified water engine built on a shared Water Field spine. See Docs/UnifiedWater_Architecture_Draft01.md.",
+  "unity": "6000.3",
+  "author": {
+    "name": "Abstract Occlusion",
+    "url": "https://abstractocclusion.com"
+  }
+}

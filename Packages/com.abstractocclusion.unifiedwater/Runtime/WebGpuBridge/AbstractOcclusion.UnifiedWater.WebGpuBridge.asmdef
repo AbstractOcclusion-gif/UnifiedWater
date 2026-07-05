@@ -1,0 +1,17 @@
+{
+    "name": "AbstractOcclusion.UnifiedWater.WebGpuBridge",
+    "rootNamespace": "AbstractOcclusion.UnifiedWater.WebGpuBridge",
+    "references": [
+        "AbstractOcclusion.UnifiedWater",
+        "AbstractOcclusion.WebGpuWater"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

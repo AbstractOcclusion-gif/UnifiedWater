@@ -1,0 +1,41 @@
+# Normalize line endings automatically
+* text=auto
+
+# ---- Source (text) ----
+*.cs        text diff=csharp
+*.shader    text
+*.compute   text
+*.hlsl      text
+*.cginc     text
+*.asmdef    text
+*.asmref    text
+*.json      text
+*.md        text
+
+# ---- Unity YAML assets: text, use Unity SmartMerge when the merge driver is configured ----
+*.unity      text merge=unityyamlmerge eol=lf
+*.prefab     text merge=unityyamlmerge eol=lf
+*.asset      text merge=unityyamlmerge eol=lf
+*.mat        text merge=unityyamlmerge eol=lf
+*.anim       text merge=unityyamlmerge eol=lf
+*.controller text merge=unityyamlmerge eol=lf
+*.meta       text merge=unityyamlmerge eol=lf
+
+# ---- Binary assets (never diff/merge as text) ----
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.tga  binary
+*.psd  binary
+*.gif  binary
+*.dds  binary
+*.exr  binary
+*.hdr  binary
+*.fbx  binary
+*.obj  binary
+*.blend binary
+*.wav  binary
+*.mp3  binary
+*.ogg  binary
+*.ttf  binary
+*.otf  binary

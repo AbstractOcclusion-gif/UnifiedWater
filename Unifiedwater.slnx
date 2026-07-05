@@ -1,0 +1,5 @@
+﻿<Solution>
+  <Project Path="AbstractOcclusion.UnifiedWater.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+</Solution>
