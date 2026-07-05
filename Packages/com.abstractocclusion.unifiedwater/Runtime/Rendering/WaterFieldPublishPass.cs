@@ -12,9 +12,15 @@ namespace AbstractOcclusion.UnifiedWater
     /// idempotent and cheap — only the sim step itself is gated to the game camera. It binds the
     /// last-completed buffers (matching the debug view) so a reader never races the in-flight compute.
     ///
-    /// One publisher, one primary domain by design: a global shader property carries a single value,
-    /// so it can only ever describe one water body. Multiple simultaneous bodies are a later migration
-    /// to per-renderer property blocks, not something this global path can express.
+    /// Texture globals are published through <c>SetGlobalTextureAfterPass</c>, which registers them in
+    /// RenderGraph's global texture slots. URP's object passes call <c>UseAllGlobalTextures</c>, so this
+    /// is the only kind of texture-global the transparent surface draw will actually bind — a raw
+    /// command-buffer <c>SetGlobalTexture</c> is invisible to that mechanism and leaves the surface
+    /// sampling an unbound (constant) texture. The scalar extent uniforms go through the command buffer.
+    ///
+    /// One publisher, one primary domain by design: a global shader property carries a single value, so
+    /// it can only ever describe one water body. Multiple simultaneous bodies are a later migration to
+    /// per-renderer property blocks, not something this global path can express.
     /// </summary>
     internal sealed class WaterFieldPublishPass : ScriptableRenderPass
     {
@@ -38,30 +44,47 @@ namespace AbstractOcclusion.UnifiedWater
                 return;
             }
 
-            PublishFieldTextures(field);
-            PublishExtent(domain.Extent);
+            // Import the last-completed buffers as graph resources so they can be assigned to global
+            // texture slots. Dynamic's post-swap write target is untouched by this frame's compute, and
+            // SurfaceNormalFoam is single-buffered, so both are safe to read this frame.
+            var dynamicHandle = renderGraph.ImportTexture(field.WriteHandle(WaterLayer.Dynamic));
+            var normalFoamHandle = renderGraph.ImportTexture(field.ReadHandle(WaterLayer.SurfaceNormalFoam));
+
+            using var builder = renderGraph.AddUnsafePass<PassData>(
+                WaterProfilingNames.FieldPublish, out var passData);
+
+            FillExtent(passData, domain.Extent);
+
+            builder.SetGlobalTextureAfterPass(dynamicHandle, WaterFieldShaderIds.DynamicGlobal);
+            builder.SetGlobalTextureAfterPass(normalFoamHandle, WaterFieldShaderIds.NormalFoamGlobal);
+
+            // Scalar globals go through the command buffer; this allowance permits that, keeps the pass
+            // from being culled, and forces it to run before the passes that read the published globals.
+            builder.AllowGlobalStateModification(true);
+            builder.SetRenderFunc<PassData>(PublishExtent);
         }
 
-        // Bind the last-completed buffers: Dynamic's post-swap write target is untouched by this
-        // frame's compute, and SurfaceNormalFoam is single-buffered so its one texture is the result.
-        private static void PublishFieldTextures(WaterField field)
+        private static void FillExtent(PassData passData, BoundedDomainExtent extent)
         {
-            Shader.SetGlobalTexture(WaterFieldShaderIds.DynamicGlobal, field.Write(WaterLayer.Dynamic));
-            Shader.SetGlobalTexture(
-                WaterFieldShaderIds.NormalFoamGlobal, field.Read(WaterLayer.SurfaceNormalFoam));
+            // Center is (world X, world Z); z/w are unused padding for the float4 uniform.
+            passData.ExtentCenter = new Vector4(extent.Center.x, extent.Center.y, 0f, 0f);
+            passData.ExtentSize = extent.SizeMeters;
+            passData.ExtentTexelSize = extent.TexelSizeMeters;
         }
 
-        // Mirror BoundedDomainExtent's world footprint so the HLSL world->uv mapping stays a copy of
-        // the C# formula. Center is (world X, world Z); z/w are unused padding for the float4 uniform.
-        private static void PublishExtent(BoundedDomainExtent extent)
+        private static void PublishExtent(PassData data, UnsafeGraphContext context)
         {
-            Shader.SetGlobalVector(
-                WaterFieldShaderIds.ExtentCenter,
-                new Vector4(extent.Center.x, extent.Center.y, UnusedUniformComponent, UnusedUniformComponent));
-            Shader.SetGlobalFloat(WaterFieldShaderIds.ExtentSize, extent.SizeMeters);
-            Shader.SetGlobalFloat(WaterFieldShaderIds.ExtentTexelSize, extent.TexelSizeMeters);
+            var cmd = context.cmd;
+            cmd.SetGlobalVector(WaterFieldShaderIds.ExtentCenter, data.ExtentCenter);
+            cmd.SetGlobalFloat(WaterFieldShaderIds.ExtentSize, data.ExtentSize);
+            cmd.SetGlobalFloat(WaterFieldShaderIds.ExtentTexelSize, data.ExtentTexelSize);
         }
 
-        private const float UnusedUniformComponent = 0f;
+        private sealed class PassData
+        {
+            internal Vector4 ExtentCenter;
+            internal float ExtentSize;
+            internal float ExtentTexelSize;
+        }
     }
 }

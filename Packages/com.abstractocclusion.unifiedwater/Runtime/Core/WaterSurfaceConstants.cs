@@ -25,5 +25,11 @@ namespace AbstractOcclusion.UnifiedWater
 
         // Above this vertex count a 16-bit index buffer overflows and the mesh needs 32-bit indices.
         internal const int MaxSixteenBitVertexCount = 65535;
+
+        // The plane's flat bounds would let the GPU frustum-cull it the instant a wave lifts a vertex
+        // above or below zero, since the shader displaces height only on the GPU. Padding the vertical
+        // extent by this margin (metres, each side) keeps it drawn. Sized for a pond; a look driving a
+        // large _HeightScale that visibly clips at the frustum edge would raise it.
+        internal const float SurfaceBoundsHeightMargin = 2f;
     }
 }

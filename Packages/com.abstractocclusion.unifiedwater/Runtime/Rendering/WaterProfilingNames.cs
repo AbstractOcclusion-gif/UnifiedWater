@@ -11,6 +11,7 @@ namespace AbstractOcclusion.UnifiedWater
         internal const string RippleInject = "Water Ripple Inject";
         internal const string WaveCompose = "Water Wave Compose";
         internal const string FieldUpdate = "Water Field Update";
+        internal const string FieldPublish = "Water Field Publish";
         internal const string FieldDebugView = "Water Field Debug View";
     }
 }

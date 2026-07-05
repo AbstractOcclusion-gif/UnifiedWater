@@ -111,7 +111,17 @@ namespace AbstractOcclusion.UnifiedWater
             mesh.normals = normals;
             mesh.triangles = indices;
             mesh.RecalculateBounds();
+            mesh.bounds = PadVerticalBounds(mesh.bounds);
             return mesh;
+        }
+
+        // Grow the AABB by the margin on each vertical side. Bounds.Expand adds its argument to the
+        // full size, so doubling the one-sided margin extends the box by the margin above and below.
+        private static Bounds PadVerticalBounds(Bounds bounds)
+        {
+            const float bothSides = 2f;
+            bounds.Expand(new Vector3(0f, WaterSurfaceConstants.SurfaceBoundsHeightMargin * bothSides, 0f));
+            return bounds;
         }
     }
 }

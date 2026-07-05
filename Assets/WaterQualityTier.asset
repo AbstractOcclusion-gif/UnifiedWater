@@ -13,3 +13,7 @@ MonoBehaviour:
   m_Name: WaterQualityTier
   m_EditorClassIdentifier: AbstractOcclusion.UnifiedWater::AbstractOcclusion.UnifiedWater.WaterQualityTier
   fieldResolution: 256
+  rippleDamping: 0.99
+  propagationSpeed: 0.4
+  simFixedDeltaTime: 0.016666668
+  surfaceMeshResolution: 256
